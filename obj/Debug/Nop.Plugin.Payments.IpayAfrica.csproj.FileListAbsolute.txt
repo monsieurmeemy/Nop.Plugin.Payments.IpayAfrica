@@ -1,0 +1,6 @@
+E:\xampp\htdocs\nopCommerce\nopCommerce-develop\src\Plugins\Nop.Plugin.Payments.IpayAfrica\bin\Debug\Nop.Plugin.Payments.IpayAfrica.dll
+E:\xampp\htdocs\nopCommerce\nopCommerce-develop\src\Plugins\Nop.Plugin.Payments.IpayAfrica\bin\Debug\Nop.Plugin.Payments.IpayAfrica.pdb
+E:\xampp\htdocs\nopCommerce\nopCommerce-develop\src\Plugins\Nop.Plugin.Payments.IpayAfrica\obj\Debug\Nop.Plugin.Payments.IpayAfrica.csprojAssemblyReference.cache
+E:\xampp\htdocs\nopCommerce\nopCommerce-develop\src\Plugins\Nop.Plugin.Payments.IpayAfrica\obj\Debug\Nop.Plugin.Payments.IpayAfrica.csproj.CoreCompileInputs.cache
+E:\xampp\htdocs\nopCommerce\nopCommerce-develop\src\Plugins\Nop.Plugin.Payments.IpayAfrica\obj\Debug\Nop.Plugin.Payments.IpayAfrica.dll
+E:\xampp\htdocs\nopCommerce\nopCommerce-develop\src\Plugins\Nop.Plugin.Payments.IpayAfrica\obj\Debug\Nop.Plugin.Payments.IpayAfrica.pdb
