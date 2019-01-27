@@ -4,7 +4,6 @@ using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Text;
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Nop.Core;
 using Nop.Core.Domain.Orders;
@@ -17,17 +16,25 @@ using Nop.Services.Logging;
 using Nop.Services.Orders;
 using Nop.Services.Payments;
 using Nop.Services.Security;
+using Nop.Services.Stores;
 using Nop.Web.Framework;
 using Nop.Web.Framework.Controllers;
 using Nop.Web.Framework.Mvc.Filters;
+using System.Net;
+using Microsoft.AspNetCore.Http;
+using Nop.Services.Directory;
+using Nop.Services.Tax;
+using Nop.Core.Domain.Directory;
+using System.Security.Cryptography;
 
-namespace Nop.Plugin.Payments.IpayAfrica
+namespace Nop.Plugin.Payments.IpayAfrica.Controllers
 {
     public class PaymentIpayAfricaController : BasePaymentController
     {
         #region Fields
-
+        private readonly CurrencySettings _currencySettings;
         private readonly IWorkContext _workContext;
+        private readonly IStoreService _storeService;
         private readonly ISettingService _settingService;
         private readonly IPaymentService _paymentService;
         private readonly IOrderService _orderService;
@@ -38,14 +45,19 @@ namespace Nop.Plugin.Payments.IpayAfrica
         private readonly IStoreContext _storeContext;
         private readonly ILogger _logger;
         private readonly IWebHelper _webHelper;
+        private readonly PaymentSettings _paymentSettings;
         private readonly IpayAfricaPaymentSettings _IpayAfricaPaymentSettings;
         private readonly ShoppingCartSettings _shoppingCartSettings;
-
+        private readonly ICheckoutAttributeParser _checkoutAttributeParser;
+        private readonly IHttpContextAccessor _httpContextAccessor;
+        private readonly ITaxService _taxService;
+        private readonly ICurrencyService _currencyService;
         #endregion
 
         #region Ctor
 
         public PaymentIpayAfricaController(IWorkContext workContext,
+            IStoreService storeService,
             ISettingService settingService,
             IPaymentService paymentService,
             IOrderService orderService,
@@ -56,10 +68,17 @@ namespace Nop.Plugin.Payments.IpayAfrica
             IStoreContext storeContext,
             ILogger logger,
             IWebHelper webHelper,
+            PaymentSettings paymentSettings,
             IpayAfricaPaymentSettings IpayAfricaPaymentSettings,
-            ShoppingCartSettings shoppingCartSettings)
+            ShoppingCartSettings shoppingCartSettings,
+            CurrencySettings currencySettings,
+            ICheckoutAttributeParser checkoutAttributeParser,
+            ICurrencyService currencyService,
+            IHttpContextAccessor httpContextAccessor,
+            ITaxService taxService)
         {
             this._workContext = workContext;
+            this._storeService = storeService;
             this._settingService = settingService;
             this._paymentService = paymentService;
             this._orderService = orderService;
@@ -70,8 +89,15 @@ namespace Nop.Plugin.Payments.IpayAfrica
             this._storeContext = storeContext;
             this._logger = logger;
             this._webHelper = webHelper;
+            this._paymentSettings = paymentSettings;
             this._IpayAfricaPaymentSettings = IpayAfricaPaymentSettings;
             this._shoppingCartSettings = shoppingCartSettings;
+            this._currencySettings = currencySettings;
+            this._checkoutAttributeParser = checkoutAttributeParser;
+            this._currencyService = currencyService;
+            this._genericAttributeService = genericAttributeService;
+            this._httpContextAccessor = httpContextAccessor;
+            this._taxService = taxService;
         }
 
         #endregion
@@ -86,30 +112,27 @@ namespace Nop.Plugin.Payments.IpayAfrica
                 return AccessDeniedView();
 
             //load settings for a chosen store scope
+            //var storeScope = this.GetActiveStoreScopeConfiguration(_storeService, _workContext);
             var storeScope = _storeContext.ActiveStoreScopeConfiguration;
             var IpayAfricaPaymentSettings = _settingService.LoadSetting<IpayAfricaPaymentSettings>(storeScope);
 
             var model = new ConfigurationModel
             {
-                Live = IpayAfricaPaymentSettings.Live,
-                VendorID = IpayAfricaPaymentSettings.VendorID,
-                HashKey = IpayAfricaPaymentSettings.HashKey,
-                PassProductNamesAndTotals = IpayAfricaPaymentSettings.PassProductNamesAndTotals,
-                AdditionalFee = IpayAfricaPaymentSettings.AdditionalFee,
-                AdditionalFeePercentage = IpayAfricaPaymentSettings.AdditionalFeePercentage,
-                ActiveStoreScopeConfiguration = storeScope
+                MerchantId = IpayAfricaPaymentSettings.MerchantId,
+                MerchantKey = IpayAfricaPaymentSettings.MerchantKey,
+                Website = IpayAfricaPaymentSettings.Website,
+                IndustryTypeId = IpayAfricaPaymentSettings.IndustryTypeId,
+                PaymentUrl = IpayAfricaPaymentSettings.PaymentUrl,
+                CallBackUrl = IpayAfricaPaymentSettings.CallBackUrl,
+                TxnStatusUrl = IpayAfricaPaymentSettings.TxnStatusUrl,
+                UseDefaultCallBack = IpayAfricaPaymentSettings.UseDefaultCallBack
             };
-            if (storeScope > 0)
-            {
-                model.UseSandbox_OverrideForStore = _settingService.SettingExists(IpayAfricaPaymentSettings, x => x.Live, storeScope);
-                model.BusinessEmail_OverrideForStore = _settingService.SettingExists(IpayAfricaPaymentSettings, x => x.VendorID, storeScope);
-                model.PdtToken_OverrideForStore = _settingService.SettingExists(IpayAfricaPaymentSettings, x => x.HashKey, storeScope);
-                model.PassProductNamesAndTotals_OverrideForStore = _settingService.SettingExists(IpayAfricaPaymentSettings, x => x.PassProductNamesAndTotals, storeScope);
-                model.AdditionalFee_OverrideForStore = _settingService.SettingExists(IpayAfricaPaymentSettings, x => x.AdditionalFee, storeScope);
-                model.AdditionalFeePercentage_OverrideForStore = _settingService.SettingExists(IpayAfricaPaymentSettings, x => x.AdditionalFeePercentage, storeScope);
-            }
-
             return View("~/Plugins/Payments.IpayAfrica/Views/Configure.cshtml", model);
+        }
+
+        private string GetStatusUrl()
+        {
+            return _IpayAfricaPaymentSettings.TxnStatusUrl;
         }
 
         [HttpPost]
@@ -124,37 +147,306 @@ namespace Nop.Plugin.Payments.IpayAfrica
             if (!ModelState.IsValid)
                 return Configure();
 
-            //load settings for a chosen store scope
-            var storeScope = _storeContext.ActiveStoreScopeConfiguration;
-            var IpayAfricaPaymentSettings = _settingService.LoadSetting<IpayAfricaPaymentSettings>(storeScope);
+            if (!ModelState.IsValid)
+                return Configure();
 
             //save settings
-            IpayAfricaPaymentSettings.Live = model.Live;
-            IpayAfricaPaymentSettings.VendorID = model.VendorID;
-            IpayAfricaPaymentSettings.HashKey = model.HashKey;
-            IpayAfricaPaymentSettings.PassProductNamesAndTotals = model.PassProductNamesAndTotals;
-            IpayAfricaPaymentSettings.AdditionalFee = model.AdditionalFee;
-            IpayAfricaPaymentSettings.AdditionalFeePercentage = model.AdditionalFeePercentage;
-
-            /* We do not clear cache after each setting update.
-             * This behavior can increase performance because cached settings will not be cleared 
-             * and loaded from database after each update */
-            _settingService.SaveSettingOverridablePerStore(IpayAfricaPaymentSettings, x => x.Live, model.UseSandbox_OverrideForStore, storeScope, false);
-            _settingService.SaveSettingOverridablePerStore(IpayAfricaPaymentSettings, x => x.VendorID, model.BusinessEmail_OverrideForStore, storeScope, false);
-            _settingService.SaveSettingOverridablePerStore(IpayAfricaPaymentSettings, x => x.HashKey, model.PdtToken_OverrideForStore, storeScope, false);
-            _settingService.SaveSettingOverridablePerStore(IpayAfricaPaymentSettings, x => x.PassProductNamesAndTotals, model.PassProductNamesAndTotals_OverrideForStore, storeScope, false);
-            _settingService.SaveSettingOverridablePerStore(IpayAfricaPaymentSettings, x => x.AdditionalFee, model.AdditionalFee_OverrideForStore, storeScope, false);
-            _settingService.SaveSettingOverridablePerStore(IpayAfricaPaymentSettings, x => x.AdditionalFeePercentage, model.AdditionalFeePercentage_OverrideForStore, storeScope, false);
-
-            //now clear settings cache
-            _settingService.ClearCache();
-
+            _IpayAfricaPaymentSettings.MerchantId = model.MerchantId;
+            _IpayAfricaPaymentSettings.MerchantKey = model.MerchantKey;
+            _IpayAfricaPaymentSettings.Website = model.Website;
+            _IpayAfricaPaymentSettings.IndustryTypeId = model.IndustryTypeId;
+            _IpayAfricaPaymentSettings.PaymentUrl = model.PaymentUrl;
+            _IpayAfricaPaymentSettings.CallBackUrl = model.CallBackUrl;
+            _IpayAfricaPaymentSettings.TxnStatusUrl = model.TxnStatusUrl;
+            _IpayAfricaPaymentSettings.UseDefaultCallBack = model.UseDefaultCallBack;
+            _settingService.SaveSetting(_IpayAfricaPaymentSettings);
             SuccessNotification(_localizationService.GetResource("Admin.Plugins.Saved"));
-
             return Configure();
+
         }
 
-        //action displaying notification (warning) to a store owner about inaccurate Ipay rounding
+        public ActionResult Return()
+        {
+            var processor = _paymentService.LoadPaymentMethodBySystemName("Payments.IpayAfrica") as IpayAfricaPaymentProcessor;
+            if (processor == null ||
+                !_paymentService.IsPaymentMethodActive(processor) || !processor.PluginDescriptor.Installed)
+                throw new NopException("IpayAfrica module cannot be loaded");
+
+
+            var myUtility = new IpayAfricaHelper();
+            string orderId, Amount, AuthDesc, ResCode;
+            bool checkSumMatch = false;
+            //Assign following values to send it to verifychecksum function.
+            if (String.IsNullOrWhiteSpace(_IpayAfricaPaymentSettings.MerchantKey))
+                throw new NopException("IpayAfrica key is not set");
+
+            string workingKey = _IpayAfricaPaymentSettings.MerchantKey;
+            string IpayAfricaChecksum = null;
+            string transactinon_code = HttpContext.Request.Query["txncd"];
+            string qwh = HttpContext.Request.Query["qwh"];
+            string afd = HttpContext.Request.Query["afd"];
+            string agt = HttpContext.Request.Query["agt"];
+            string uyt = HttpContext.Request.Query["uyt"];
+            string ifd = HttpContext.Request.Query["ifd"];
+            string poi = HttpContext.Request.Query["poi"];
+            string returned_order_id = HttpContext.Request.Query["id"];
+            string returned_order_invoice = HttpContext.Request.Query["ivm"];
+            string status = HttpContext.Request.Query["status"];
+            string paid_total = HttpContext.Request.Query["mc"] + "00";
+            string p1 = HttpContext.Request.Query["p1"];
+            string p2 = HttpContext.Request.Query["p2"];
+            string p3 = HttpContext.Request.Query["p3"];
+            string p4 = HttpContext.Request.Query["p4"];
+            string msisdn_id = HttpContext.Request.Query["msisdn_id"];
+            string msisdn_idnum = HttpContext.Request.Query["msisdn_idnum"];
+            string channel = HttpContext.Request.Query["channel"];
+            string hash_id = HttpContext.Request.Query["hsh"];
+
+            Dictionary<string, string> parameters = new Dictionary<string, string>();
+  
+            Dictionary<string, string> parameters1 = new Dictionary<string, string>
+            {
+                ["txncd"] = transactinon_code,
+                ["qwh"] = qwh,
+                ["afd"] = afd,
+                ["poi"] = poi,
+                ["uyt"] = uyt,
+                ["ifd"] = ifd,
+                ["agt"] = agt,
+                ["id"] = returned_order_id,
+                ["status"] = status,
+                ["ivm"] = returned_order_invoice,
+                ["mc"] = paid_total,
+                ["p1"] = p1,
+                ["p2"] = p2,
+                ["p3"] = p3,
+                ["p4"] = p4,
+                ["msisdn_id"] = p1,
+                ["msisdn_idnum"] = p2,
+                ["channel"] = p3,
+                ["p4"] = p4,
+                ["hsh"] = HttpContext.Request.Query["hsh"]
+            };
+     
+            var live = "1";
+            string key = _IpayAfricaPaymentSettings.MerchantKey;
+            var storeLocation = _webHelper.GetStoreLocation();
+            string vendor_id = _IpayAfricaPaymentSettings.MerchantId;
+            string currency = p3;
+            string customer_email = p1;
+            string mobile_number = msisdn_idnum;
+            string callback_url = p2;
+            string email_notify = "1";
+            string curl = p4;
+            if (mobile_number.Length > 10)
+            {
+                mobile_number = mobile_number.Remove(0, 3).Insert(0, "0");
+            }
+
+            string datastring = live.ToString() + returned_order_id + returned_order_invoice + paid_total + mobile_number + customer_email + vendor_id + currency + p1 + p2 + p3 + p4 + callback_url + email_notify + curl;
+            byte[] keyByte = new ASCIIEncoding().GetBytes(key);
+            byte[] messageBytes = new ASCIIEncoding().GetBytes(datastring);
+            byte[] hashmessage = new HMACSHA1(keyByte).ComputeHash(messageBytes);
+            String.Concat(Array.ConvertAll(hashmessage, x => x.ToString("x2")));
+            string hash_message = String.Concat(Array.ConvertAll(hashmessage, x => x.ToString("x2")));
+
+            if (hash_id != null)
+            {
+                IpayAfricaChecksum = hash_id;
+            }
+            if (IpayAfricaChecksum == String.Concat(Array.ConvertAll(hashmessage, x => x.ToString("x2"))))
+            {
+                checkSumMatch = true;
+            }
+            
+            orderId = returned_order_id;
+            Amount = HttpContext.Request.Query["mc"];
+            ResCode = returned_order_invoice;
+            AuthDesc = status;
+
+            var order = _orderService.GetOrderById(Convert.ToInt32(orderId));
+            if (checkSumMatch == true)
+            {
+                if (AuthDesc == "aei7p7yrx4ae34")
+                {
+                    string ipnurl2 = "https://www.ipayafrica.com/ipn/?vendor=" + _IpayAfricaPaymentSettings.MerchantId + "&id=" + HttpContext.Request.Query["id"] + "&ivm=" + HttpContext.Request.Query["ivm"] + "&qwh=" + HttpContext.Request.Query["qwh"] + "&afd=" + HttpContext.Request.Query["afd"] + "&poi=" + HttpContext.Request.Query["poi"] + "&uyt=" + HttpContext.Request.Query["uyt"] + "&ifd=" + HttpContext.Request.Query["ifd"];
+
+                    string html = string.Empty;
+                    string url = ipnurl2;
+
+                    HttpWebRequest request = (HttpWebRequest)WebRequest.Create(url);
+
+                    using (HttpWebResponse response = (HttpWebResponse)request.GetResponse())
+                    using (Stream stream = response.GetResponseStream())
+                    using (StreamReader reader = new StreamReader(stream))
+                    {
+                        html = reader.ReadToEnd();
+                    }
+                    if (TxnStatus(orderId, order.OrderTotal.ToString("0.00")))
+                    {
+                        if (_orderProcessingService.CanMarkOrderAsPaid(order))
+                        {
+                            _orderProcessingService.MarkOrderAsPaid(order);
+                        }
+                        return RedirectToRoute("CheckoutCompleted", new { orderId = order.Id });
+                    }
+                    else
+                    {
+                        return Content("Amount Mismatch" + " " + html + " " + order.OrderTotal.ToString());
+                    }
+                }
+                else if (AuthDesc == "fe2707etr5s4wq")
+                {
+                    _orderProcessingService.CancelOrder(order, false);
+                    order.OrderStatus = OrderStatus.Cancelled;
+                    _orderService.UpdateOrder(order);
+                    return RedirectToRoute("OrderDetails", new { orderId = order.Id });
+                }
+                else
+                {
+                    return Content("Security Error. Illegal access detected. Please try again");
+                }
+            }
+            else if (string.IsNullOrEmpty(IpayAfricaChecksum))
+            {
+                return Content("Please Contact Customer Care");
+            }
+            else if (status == "dtfi4p7yty45wq")//less paid
+            {
+                return Content("Payment Failed. You Paid less than what was requested");
+            }
+            else if (status == "eq3i7p5yt7645e")//more paid
+            {
+                string ipnurl2 = "https://www.ipayafrica.com/ipn/?vendor=" + _IpayAfricaPaymentSettings.MerchantId + "&id=" + HttpContext.Request.Query["id"] + "&ivm=" + HttpContext.Request.Query["ivm"] + "&qwh=" + HttpContext.Request.Query["qwh"] + "&afd=" + HttpContext.Request.Query["afd"] + "&poi=" + HttpContext.Request.Query["poi"] + "&uyt=" + HttpContext.Request.Query["uyt"] + "&ifd=" + HttpContext.Request.Query["ifd"];
+
+                string html = string.Empty;
+                string url = ipnurl2;
+
+                HttpWebRequest request = (HttpWebRequest)WebRequest.Create(url);
+
+                using (HttpWebResponse response = (HttpWebResponse)request.GetResponse())
+                using (Stream stream = response.GetResponseStream())
+                using (StreamReader reader = new StreamReader(stream))
+                {
+                    html = reader.ReadToEnd();
+                }
+                if (html.Contains("aei7p7yrx4ae34") || html.Contains("eq3i7p5yt7645e"))
+                {
+                    if (_orderProcessingService.CanMarkOrderAsPaid(order))
+                    {
+                        _orderProcessingService.MarkOrderAsPaid(order);
+                    }
+                    return RedirectToRoute("CheckoutCompleted", new { orderId = order.Id });
+                }
+                else
+                {
+                    return Content("Amount Mismatch");
+                }
+            }
+            else if (status == "bdi6p2yy76etrs")//pending
+            {
+                return RedirectToRoute("OrderDetails", new { orderId = order.Id });
+            }
+            else if(status == "fe2707etr5s4wq")//failed
+            {
+                //return Content("Security Error. Illegal access detected, Checksum failed");
+                if (_orderProcessingService.CanVoidOffline(order))
+                {
+                    _orderProcessingService.VoidOffline(order);
+                }
+                return RedirectToRoute("OrderDetails", new { orderId = order.Id});
+            }
+            else
+            {
+                //if(status == "")
+                //{
+
+                //}
+                string ipnurl2 = "https://www.ipayafrica.com/ipn/?vendor=" + _IpayAfricaPaymentSettings.MerchantId + "&id=" + HttpContext.Request.Query["id"] + "&ivm=" + HttpContext.Request.Query["ivm"] + "&qwh=" + HttpContext.Request.Query["qwh"] + "&afd=" + HttpContext.Request.Query["afd"] + "&poi=" + HttpContext.Request.Query["poi"] + "&uyt=" + HttpContext.Request.Query["uyt"] + "&ifd=" + HttpContext.Request.Query["ifd"];
+
+                string html = string.Empty;
+                string url = ipnurl2;
+
+                HttpWebRequest request = (HttpWebRequest)WebRequest.Create(url);
+
+                using (HttpWebResponse response = (HttpWebResponse)request.GetResponse())
+                using (Stream stream = response.GetResponseStream())
+                using (StreamReader reader = new StreamReader(stream))
+                {
+                    html = reader.ReadToEnd();
+                }
+                if (html.Contains("aei7p7yrx4ae34") || html.Contains("eq3i7p5yt7645e"))
+                {
+                    if (_orderProcessingService.CanMarkOrderAsPaid(order))
+                    {
+                        _orderProcessingService.MarkOrderAsPaid(order);
+                    }
+                    return RedirectToRoute("CheckoutCompleted", new { orderId = order.Id });
+                }
+                else
+                {
+                    return Content("Amount Mismatch");
+                }
+                //return RedirectToRoute("OrderDetails", new { orderId = order.Id });
+            }
+        }
+
+        private bool TxnStatus(string OrderId, String amount)
+        {
+            String uri = GetStatusUrl();
+            Dictionary<string, string> parameters = new Dictionary<string, string>();
+
+            parameters.Add("vendor", _IpayAfricaPaymentSettings.MerchantId);
+            parameters.Add("id", OrderId);
+            parameters.Add("ivm", HttpContext.Request.Query["ivm"]);
+            parameters.Add("qwh", HttpContext.Request.Query["qwh"]);
+            parameters.Add("afd", HttpContext.Request.Query["afd"]);
+            parameters.Add("poi", HttpContext.Request.Query["poi"]);
+            parameters.Add("uyt", HttpContext.Request.Query["uyt"]);
+            parameters.Add("ifd", HttpContext.Request.Query["ifd"]);
+
+            string ipnurl2 = "https://www.ipayafrica.com/ipn/?vendor=" + _IpayAfricaPaymentSettings.MerchantId + "&id=" + HttpContext.Request.Query["id"] + "&ivm=" + HttpContext.Request.Query["ivm"] + "&qwh=" + HttpContext.Request.Query["qwh"] + "&afd=" + HttpContext.Request.Query["afd"] + "&poi=" + HttpContext.Request.Query["poi"] + "&uyt=" + HttpContext.Request.Query["uyt"] + "&ifd=" + HttpContext.Request.Query["ifd"];
+
+            string checksum = HttpContext.Request.Query["hsh"];
+
+            try
+            {
+                string postData = "{\"vendor\":\"" + _IpayAfricaPaymentSettings.MerchantId + "\",\"id\":\"" + OrderId + "\",\"ivm\":\"" + HttpContext.Request.Query["ivm"] + OrderId + "\",\"qwh\":\"" + HttpContext.Request.Query["qwh"] + "\",\"afd\":\"" + HttpContext.Request.Query["afd"] + "\",\"poi\":\"" + HttpContext.Request.Query["poi"] + "\",\"uyt\":\"" + HttpContext.Request.Query["uyt"] + "\",\"ifd\":\"" + HttpContext.Request.Query["ifd"] + "\"}";
+
+                HttpWebRequest webRequest = (HttpWebRequest)WebRequest.Create(uri);
+                webRequest.Method = "POST";
+                webRequest.Accept = "text/html";
+                webRequest.ContentType = "text/html";
+                string html = string.Empty;
+                string url = ipnurl2;
+
+                HttpWebRequest request = (HttpWebRequest)WebRequest.Create(url);
+
+                using (HttpWebResponse response = (HttpWebResponse)request.GetResponse())
+                using (Stream stream = response.GetResponseStream())
+                using (StreamReader reader = new StreamReader(stream))
+                {
+                    html = reader.ReadToEnd();
+
+                    if (html.Contains("aei7p7yrx4ae34"))
+                    {
+                        return true;
+                    }
+                    else
+                    {
+
+                        //
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+
+            }
+            return false;
+        }
+
+        //action displaying notification (warning) to a store owner about inaccurate IpayAfrica rounding
         [AuthorizeAdmin]
         [Area(AreaNames.Admin)]
         public IActionResult RoundingWarning(bool passProductNamesAndTotals)
@@ -176,7 +468,7 @@ namespace Nop.Plugin.Payments.IpayAfrica
             var processor = _paymentService.LoadPaymentMethodBySystemName("Payments.IpayAfrica") as IpayAfricaPaymentProcessor;
             if (processor == null ||
                 !_paymentService.IsPaymentMethodActive(processor) || !processor.PluginDescriptor.Installed)
-                throw new NopException("Ipay Africa module cannot be loaded");
+                throw new NopException("IpayAfrica Standard module cannot be loaded");
 
             if (processor.GetPdtDetails(tx, out Dictionary<string, string> values, out string response))
             {
@@ -193,68 +485,37 @@ namespace Nop.Plugin.Payments.IpayAfrica
                     var mc_gross = decimal.Zero;
                     try
                     {
-                        mc_gross = decimal.Parse(values["mc"], new CultureInfo("en-US"));
+                        mc_gross = decimal.Parse(values["mc_gross"], new CultureInfo("en-US"));
                     }
                     catch (Exception exc)
                     {
-                        _logger.Error("Ipay PDT. Error getting mc_gross", exc);
+                        _logger.Error("IpayAfrica PDT. Error getting mc_gross", exc);
                     }
 
-                    values.TryGetValue("uyt", out string uyt);
-                    values.TryGetValue("status", out string payment_status);
-                    values.TryGetValue("txncd", out string trans_code);
-                    values.TryGetValue("qwh", out string qwh);
-                    values.TryGetValue("id", out string txn_id);
-                    values.TryGetValue("poi", out string poi);
-                    values.TryGetValue("ivm", out string rp_invoice_id);
-                    values.TryGetValue("channel", out string payment_type);
-                    values.TryGetValue("msisdn_idnum", out string payer_id);
-                    values.TryGetValue("afd", out string afd);
-                    values.TryGetValue("ivm", out string inv_number);
-                    values.TryGetValue("ifd", out string ifd);
-                    values.TryGetValue("mc", out string payment_fee);
-                    string ipnurl2 = "https://www.ipayafrica.com/ipn/?vendor=" + _IpayAfricaPaymentSettings.VendorID + "&id=" + txn_id + "&ivm=" + rp_invoice_id + "&qwh=" + qwh + "&afd=" + afd + "&poi=" + poi + "&uyt=" + uyt + "&ifd=" + ifd;
-          
+                    values.TryGetValue("payer_status", out string payer_status);
+                    values.TryGetValue("payment_status", out string payment_status);
+                    values.TryGetValue("pending_reason", out string pending_reason);
+                    values.TryGetValue("mc_currency", out string mc_currency);
+                    values.TryGetValue("txn_id", out string txn_id);
+                    values.TryGetValue("payment_type", out string payment_type);
+                    values.TryGetValue("payer_id", out string payer_id);
+                    values.TryGetValue("receiver_id", out string receiver_id);
+                    values.TryGetValue("invoice", out string invoice);
+                    values.TryGetValue("payment_fee", out string payment_fee);
+
                     var sb = new StringBuilder();
-
-                    sb.AppendLine("Ipay PDT:");
-                    sb.AppendLine("mc: " + mc_gross);
-                    sb.AppendLine("txncd: " + trans_code);
-                    sb.AppendLine("status: " + payment_status);
-                    sb.AppendLine("qwh: " + qwh);
-                    sb.AppendLine("poi: " + poi);
-                    sb.AppendLine("id: " + txn_id);
-                    sb.AppendLine("channel: " + payment_type);
-                    sb.AppendLine("msisdn_idnum: " + payer_id);
-                    sb.AppendLine("qwh: " + qwh);
-                    sb.AppendLine("ivm: " + rp_invoice_id);
-                    sb.AppendLine("mc: " + payment_fee);
-                    sb.AppendLine("afd: " + afd);
-
-                    //values.TryGetValue("payer_status", out string payer_status);
-                    //values.TryGetValue("payment_status", out string payment_status);
-                    //values.TryGetValue("pending_reason", out string pending_reason);
-                    //values.TryGetValue("mc_currency", out string mc_currency);
-                    //values.TryGetValue("txn_id", out string txn_id);
-                    //values.TryGetValue("payment_type", out string payment_type);
-                    //values.TryGetValue("payer_id", out string payer_id);
-                    //values.TryGetValue("receiver_id", out string receiver_id);
-                    //values.TryGetValue("invoice", out string invoice);
-                    //values.TryGetValue("payment_fee", out string payment_fee);
-
-                    //var sb = new StringBuilder();
-                    //sb.AppendLine("Ipay PDT:");
-                    //sb.AppendLine("mc_gross: " + mc_gross);
-                    //sb.AppendLine("Payer status: " + payer_status);
-                    //sb.AppendLine("Payment status: " + payment_status);
-                    //sb.AppendLine("Pending reason: " + string.Empty);
-                    //sb.AppendLine("mc_currency: " + mc_currency);
-                    //sb.AppendLine("txn_id: " + txn_id);
-                    //sb.AppendLine("payment_type: " + payment_type);
-                    //sb.AppendLine("payer_id: " + payer_id);
-                    //sb.AppendLine("receiver_id: " + receiver_id);
-                    //sb.AppendLine("invoice: " + invoice);
-                    //sb.AppendLine("payment_fee: " + payment_fee);
+                    sb.AppendLine("IpayAfrica PDT:");
+                    sb.AppendLine("mc_gross: " + mc_gross);
+                    sb.AppendLine("Payer status: " + payer_status);
+                    sb.AppendLine("Payment status: " + payment_status);
+                    sb.AppendLine("Pending reason: " + string.Empty);
+                    sb.AppendLine("mc_currency: " + mc_currency);
+                    sb.AppendLine("txn_id: " + txn_id);
+                    sb.AppendLine("payment_type: " + payment_type);
+                    sb.AppendLine("payer_id: " + payer_id);
+                    sb.AppendLine("receiver_id: " + receiver_id);
+                    sb.AppendLine("invoice: " + invoice);
+                    sb.AppendLine("payment_fee: " + payment_fee);
 
                     var newPaymentStatus = IpayAfricaHelper.GetPaymentStatus(payment_status, string.Empty);
                     sb.AppendLine("New payment status: " + newPaymentStatus);
@@ -269,11 +530,11 @@ namespace Nop.Plugin.Payments.IpayAfrica
                     _orderService.UpdateOrder(order);
 
                     //validate order total
-                    var orderTotalSentToIpay = _genericAttributeService.GetAttribute<decimal?>(order, IpayAfricaHelper.OrderTotalSentToIpay);
-                    if (orderTotalSentToIpay.HasValue && mc_gross != orderTotalSentToIpay.Value)
+                    var orderTotalSentToIpayAfrica = _genericAttributeService.GetAttribute<decimal?>(order, IpayAfricaHelper.OrderTotalSentToIpayAfrica);
+                    if (orderTotalSentToIpayAfrica.HasValue && mc_gross != orderTotalSentToIpayAfrica.Value)
                     {
                         var errorStr =
-                            $"Ipay PDT. Returned order total {mc_gross} doesn't equal order total {order.OrderTotal}. Order# {order.Id}.";
+                            $"IpayAfrica PDT. Returned order total {mc_gross} doesn't equal order total {order.OrderTotal}. Order# {order.Id}.";
                         //log
                         _logger.Error(errorStr);
                         //order note
@@ -288,8 +549,8 @@ namespace Nop.Plugin.Payments.IpayAfrica
                         return RedirectToAction("Index", "Home", new { area = "" });
                     }
                     //clear attribute
-                    if (orderTotalSentToIpay.HasValue)
-                        _genericAttributeService.SaveAttribute<decimal?>(order, IpayAfricaHelper.OrderTotalSentToIpay, null);
+                    if (orderTotalSentToIpayAfrica.HasValue)
+                        _genericAttributeService.SaveAttribute<decimal?>(order, IpayAfricaHelper.OrderTotalSentToIpayAfrica, null);
 
                     //mark order as paid
                     if (newPaymentStatus == PaymentStatus.Paid)
@@ -322,7 +583,7 @@ namespace Nop.Plugin.Payments.IpayAfrica
                     //order note
                     order.OrderNotes.Add(new OrderNote
                     {
-                        Note = "Ipay PDT failed. " + response,
+                        Note = "IpayAfrica PDT failed. " + response,
                         DisplayToCustomer = false,
                         CreatedOnUtc = DateTime.UtcNow
                     });
@@ -345,7 +606,7 @@ namespace Nop.Plugin.Payments.IpayAfrica
             var processor = _paymentService.LoadPaymentMethodBySystemName("Payments.IpayAfrica") as IpayAfricaPaymentProcessor;
             if (processor == null ||
                 !_paymentService.IsPaymentMethodActive(processor) || !processor.PluginDescriptor.Installed)
-                throw new NopException("Ipay Africa module cannot be loaded");
+                throw new NopException("IpayAfrica Standard module cannot be loaded");
 
             if (processor.VerifyIpn(strRequest, out Dictionary<string, string> values))
             {
@@ -353,60 +614,36 @@ namespace Nop.Plugin.Payments.IpayAfrica
                 var mc_gross = decimal.Zero;
                 try
                 {
-                    mc_gross = decimal.Parse(values["mc"], new CultureInfo("en-US"));
+                    mc_gross = decimal.Parse(values["mc_gross"], new CultureInfo("en-US"));
                 }
                 catch { }
-                string val1 = HttpContext.Request.Query["id"];
-                string val2 = HttpContext.Request.Query["ivm"];
-                string val3 = HttpContext.Request.Query["qwh"];
-                string val4 = HttpContext.Request.Query["afd"];
-                string val5 = HttpContext.Request.Query["poi"];
-                string val6 = HttpContext.Request.Query["uyt"];
-                string val7 = HttpContext.Request.Query["ifd"];
-                string ipnurl2 = "https://www.ipayafrica.com/ipn/?vendor=" + _IpayAfricaPaymentSettings.VendorID + "&id=" + val1 + "&ivm=" + val2 + "&qwh=" + val3 + "&afd=" + val4 + "&poi=" + val5 + "&uyt=" + val6 + "&ifd=" + val7;
-               
-                values.TryGetValue("uyt", out string uyt);
-                values.TryGetValue("status", out string payment_status);
-                values.TryGetValue("txncd", out string trans_code);
-                values.TryGetValue("qwh", out string qwh);
-                values.TryGetValue("id", out string txn_id);
-                values.TryGetValue("poi", out string poi);
-                values.TryGetValue("ivm", out string rp_invoice_id);
-                values.TryGetValue("channel", out string payment_type);
-                values.TryGetValue("msisdn_idnum", out string payer_id);
-                values.TryGetValue("afd", out string afd);
-                values.TryGetValue("ivm", out string inv_number);
-                values.TryGetValue("ifd", out string ifd);
-                values.TryGetValue("mc", out string payment_fee);
 
-                //values.TryGetValue("payer_status", out string payer_status);
-                //values.TryGetValue("payment_status", out string payment_status);
-                //values.TryGetValue("pending_reason", out string pending_reason);
-                //values.TryGetValue("mc_currency", out string mc_currency);
-                //values.TryGetValue("txn_id", out string txn_id);
-                //values.TryGetValue("txn_type", out string txn_type);
-                //values.TryGetValue("rp_invoice_id", out string rp_invoice_id);
-                //values.TryGetValue("payment_type", out string payment_type);
-                //values.TryGetValue("payer_id", out string payer_id);
-                //values.TryGetValue("receiver_id", out string receiver_id);
-                //values.TryGetValue("invoice", out string _);
-                //values.TryGetValue("payment_fee", out string payment_fee);
-
-                string ipnurl = "https://www.ipayafrica.com/ipn/?vendor=" + _IpayAfricaPaymentSettings.VendorID  + "&id=" + txn_id + "&ivm=" + rp_invoice_id + "&qwh=" + qwh + "&afd=" + afd + "&poi=" + poi + "&uyt=" + uyt + "&ifd=" + ifd;
+                values.TryGetValue("payer_status", out string payer_status);
+                values.TryGetValue("payment_status", out string payment_status);
+                values.TryGetValue("pending_reason", out string pending_reason);
+                values.TryGetValue("mc_currency", out string mc_currency);
+                values.TryGetValue("txn_id", out string txn_id);
+                values.TryGetValue("txn_type", out string txn_type);
+                values.TryGetValue("rp_invoice_id", out string rp_invoice_id);
+                values.TryGetValue("payment_type", out string payment_type);
+                values.TryGetValue("payer_id", out string payer_id);
+                values.TryGetValue("receiver_id", out string receiver_id);
+                values.TryGetValue("invoice", out string _);
+                values.TryGetValue("payment_fee", out string payment_fee);
 
                 #endregion
 
                 var sb = new StringBuilder();
-                sb.AppendLine("Ipay IPN:");
+                sb.AppendLine("IpayAfrica IPN:");
                 foreach (var kvp in values)
                 {
                     sb.AppendLine(kvp.Key + ": " + kvp.Value);
                 }
 
-                var newPaymentStatus = IpayAfricaHelper.GetPaymentStatus(payment_status, payment_type);
+                var newPaymentStatus = IpayAfricaHelper.GetPaymentStatus(payment_status, pending_reason);
                 sb.AppendLine("New payment status: " + newPaymentStatus);
 
-                switch (payment_type)
+                switch (txn_type)
                 {
                     case "recurring_payment_profile_created":
                         //do nothing here
@@ -467,7 +704,7 @@ namespace Nop.Plugin.Payments.IpayAfrica
                                             //failed payment
                                             var failedPaymentResult = new ProcessPaymentResult
                                             {
-                                                Errors = new[] { $"Ipay IPN. Recurring payment is {payment_status} ." },
+                                                Errors = new[] { $"IpayAfrica IPN. Recurring payment is {payment_status} ." },
                                                 RecurringPaymentFailed = true
                                             };
                                             _orderProcessingService.ProcessNextRecurringPayment(rp, failedPaymentResult);
@@ -476,11 +713,11 @@ namespace Nop.Plugin.Payments.IpayAfrica
                                 }
 
                                 //this.OrderService.InsertOrderNote(newOrder.OrderId, sb.ToString(), DateTime.UtcNow);
-                                _logger.Information("Ipay IPN. Recurring info", new NopException(sb.ToString()));
+                                _logger.Information("IpayAfrica IPN. Recurring info", new NopException(sb.ToString()));
                             }
                             else
                             {
-                                _logger.Error("Ipay IPN. Order is not found", new NopException(sb.ToString()));
+                                _logger.Error("IpayAfrica IPN. Order is not found", new NopException(sb.ToString()));
                             }
                         }
                         break;
@@ -493,7 +730,7 @@ namespace Nop.Plugin.Payments.IpayAfrica
                                 var recurringPayment = _orderService.SearchRecurringPayments(initialOrderId: initialOrder.Id).FirstOrDefault();
                                 //failed payment
                                 if (recurringPayment != null)
-                                    _orderProcessingService.ProcessNextRecurringPayment(recurringPayment, new ProcessPaymentResult { Errors = new[] { payment_type }, RecurringPaymentFailed = true });
+                                    _orderProcessingService.ProcessNextRecurringPayment(recurringPayment, new ProcessPaymentResult { Errors = new[] { txn_type }, RecurringPaymentFailed = true });
                             }
                         }
                         break;
@@ -545,7 +782,7 @@ namespace Nop.Plugin.Payments.IpayAfrica
                                             {
                                                 //not valid
                                                 var errorStr =
-                                                    $"Ipay IPN. Returned order total {mc_gross} doesn't equal order total {order.OrderTotal}. Order# {order.Id}.";
+                                                    $"IpayAfrica IPN. Returned order total {mc_gross} doesn't equal order total {order.OrderTotal}. Order# {order.Id}.";
                                                 //log
                                                 _logger.Error(errorStr);
                                                 //order note
@@ -561,12 +798,8 @@ namespace Nop.Plugin.Payments.IpayAfrica
                                         break;
                                     case PaymentStatus.Paid:
                                         {
-                                            //if (Request.Query["Status"].ToString().Equals("aei7p7yrx4ae34"))
-                                            //{
-
-                                            //}
-                                                //validate order total
-                                            if (Math.Round(mc_gross, 2).Equals(Math.Round(order.OrderTotal, 2)) || Request.Query["status"].Equals("aei7p7yrx4ae34"))
+                                            //validate order total
+                                            if (Math.Round(mc_gross, 2).Equals(Math.Round(order.OrderTotal, 2)))
                                             {
                                                 //valid
                                                 if (_orderProcessingService.CanMarkOrderAsPaid(order))
@@ -581,7 +814,7 @@ namespace Nop.Plugin.Payments.IpayAfrica
                                             {
                                                 //not valid
                                                 var errorStr =
-                                                    $"Ipay IPN. Returned order total {mc_gross} doesn't equal order total {order.OrderTotal}. Order# {order.Id}.";
+                                                    $"IpayAfrica IPN. Returned order total {mc_gross} doesn't equal order total {order.OrderTotal}. Order# {order.Id}.";
                                                 //log
                                                 _logger.Error(errorStr);
                                                 //order note
@@ -630,7 +863,7 @@ namespace Nop.Plugin.Payments.IpayAfrica
                             }
                             else
                             {
-                                _logger.Error("Ipay IPN. Order is not found", new NopException(sb.ToString()));
+                                _logger.Error("IpayAfrica IPN. Order is not found", new NopException(sb.ToString()));
                             }
                         }
                         #endregion
@@ -639,7 +872,7 @@ namespace Nop.Plugin.Payments.IpayAfrica
             }
             else
             {
-                _logger.Error("Ipay IPN failed.", new NopException(strRequest));
+                _logger.Error("IpayAfrica IPN failed.", new NopException(strRequest));
             }
 
             //nothing should be rendered to visitor

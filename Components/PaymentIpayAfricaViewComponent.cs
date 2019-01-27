@@ -1,4 +1,5 @@
 ﻿using Microsoft.AspNetCore.Mvc;
+using Nop.Plugin.Payments.IpayAfrica.Models;
 using Nop.Web.Framework.Components;
 
 namespace Nop.Plugin.Payments.IpayAfrica.Components
@@ -8,7 +9,12 @@ namespace Nop.Plugin.Payments.IpayAfrica.Components
     {
         public IViewComponentResult Invoke()
         {
-            return View("~/Plugins/Payments.IpayAfrica/Views/PaymentInfo.cshtml");
+            var model = new PaymentInfoModel()
+            {
+
+            };
+
+            return View("~/Plugins/Payments.IpayAfrica/Views/PaymentInfo.cshtml", model);
         }
     }
 }

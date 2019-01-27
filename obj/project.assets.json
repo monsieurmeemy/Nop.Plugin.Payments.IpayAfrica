@@ -89,6 +89,18 @@
           "lib/netstandard1.3/Castle.Core.dll": {}
         }
       },
+      "CloudinaryDotNet/1.6.0": {
+        "type": "package",
+        "dependencies": {
+          "Newtonsoft.Json": "11.0.1"
+        },
+        "compile": {
+          "lib/netstandard1.3/CloudinaryDotNet.dll": {}
+        },
+        "runtime": {
+          "lib/netstandard1.3/CloudinaryDotNet.dll": {}
+        }
+      },
       "EPPlus/4.5.2.1": {
         "type": "package",
         "dependencies": {
@@ -5198,6 +5210,7 @@
         "type": "project",
         "framework": ".NETCoreApp,Version=v2.1",
         "dependencies": {
+          "CloudinaryDotNet": "1.6.0",
           "EPPlus": "4.5.2.1",
           "MaxMind.GeoIP2": "3.0.0",
           "Nop.Core": "4.1.0",
@@ -5334,6 +5347,23 @@
         "lib/netstandard1.3/Castle.Core.dll",
         "lib/netstandard1.3/Castle.Core.xml",
         "readme.txt"
+      ]
+    },
+    "CloudinaryDotNet/1.6.0": {
+      "sha512": "450lII3Y0hJ2izbmRJxj5ujL3ultarQUhz1x9kKH1wMVWqsZNWdbkhwEuZ9A2t6jAYHopFyWPwU1fqHiCbIAbQ==",
+      "type": "package",
+      "path": "cloudinarydotnet/1.6.0",
+      "files": [
+        ".nupkg.metadata",
+        ".signature.p7s",
+        "cloudinarydotnet.1.6.0.nupkg.sha512",
+        "cloudinarydotnet.nuspec",
+        "lib/net40/CloudinaryDotNet.dll",
+        "lib/net40/Newtonsoft.Json.dll",
+        "lib/netcore/CloudinaryDotNet.deps.json",
+        "lib/netcore/CloudinaryDotNet.dll",
+        "lib/netstandard1.3/CloudinaryDotNet.deps.json",
+        "lib/netstandard1.3/CloudinaryDotNet.dll"
       ]
     },
     "EPPlus/4.5.2.1": {

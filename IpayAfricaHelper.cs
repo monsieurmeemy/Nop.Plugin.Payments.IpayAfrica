@@ -3,7 +3,7 @@ using Nop.Core.Domain.Payments;
 namespace Nop.Plugin.Payments.IpayAfrica
 {
     /// <summary>
-    /// Represents Ipay helper
+    /// Represents IpayAfrica helper
     /// </summary>
     public class IpayAfricaHelper
     {
@@ -15,9 +15,9 @@ namespace Nop.Plugin.Payments.IpayAfrica
         public static string NopCommercePartnerCode => "nopCommerce_SP";
 
         /// <summary>
-        /// Get the generic attribute name that is used to store an order total that actually sent to Ipay (used to PDT order total validation)
+        /// Get the generic attribute name that is used to store an order total that actually sent to IpayAfrica (used to PDT order total validation)
         /// </summary>
-        public static string OrderTotalSentToIpay => "OrderTotalSentToIpay";
+        public static string OrderTotalSentToIpayAfrica => "OrderTotalSentToIpayAfrica";
 
         #endregion
 
@@ -26,8 +26,8 @@ namespace Nop.Plugin.Payments.IpayAfrica
         /// <summary>
         /// Gets a payment status
         /// </summary>
-        /// <param name="paymentStatus">Ipay payment status</param>
-        /// <param name="pendingReason">Ipay pending reason</param>
+        /// <param name="paymentStatus">IpayAfrica payment status</param>
+        /// <param name="pendingReason">IpayAfrica pending reason</param>
         /// <returns>Payment status</returns>
         public static PaymentStatus GetPaymentStatus(string paymentStatus, string pendingReason)
         {
