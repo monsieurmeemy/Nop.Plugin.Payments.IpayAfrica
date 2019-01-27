@@ -1,0 +1,62 @@
+﻿@model Nop.Plugin.Payments.IpayAfrica.Models.ConfigurationModel
+@inject Nop.Core.IWebHelper webHelper
+@{
+    Layout = "_ConfigurePlugin";
+}
+
+<form asp-controller="PaymentIpayAfrica" asp-action="Configure" method="post">
+    <div class="panel-group">
+        <div class="panel panel-default">
+            <div class="panel-body">
+                <div class="form-group">
+                    <div class="col-md-3">
+                        <nop-override-store-checkbox asp-for="MerchantId" asp-input="MerchantId" asp-store-scope="@Model.ActiveStoreScopeConfiguration" />
+                        <nop-label asp-for="MerchantId" />
+                    </div>
+                    <div class="col-md-9">
+                        <nop-editor asp-for="MerchantId" />
+                        <span asp-validation-for="MerchantId"></span>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <div class="col-md-3">
+                        <nop-override-store-checkbox asp-for="MerchantKey" asp-input="MerchantKey" asp-store-scope="@Model.ActiveStoreScopeConfiguration" />
+                        <nop-label asp-for="MerchantKey" />
+                    </div>
+                    <div class="col-md-9">
+                        <nop-editor asp-for="MerchantKey" />
+                        <span asp-validation-for="MerchantKey"></span>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <div class="col-md-3">
+                        <nop-override-store-checkbox asp-for="CallBackUrl" asp-input="CallBackUrl" asp-store-scope="@Model.ActiveStoreScopeConfiguration" />
+                        <nop-label asp-for="CallBackUrl" />
+                    </div>
+                    <div class="col-md-9">
+                        <nop-editor asp-for="CallBackUrl" />
+                        <span asp-validation-for="CallBackUrl"></span>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <div class="col-md-3">
+                        <nop-override-store-checkbox asp-for="UseDefaultCallBack" asp-input="UseDefaultCallBack" asp-store-scope="@Model.ActiveStoreScopeConfiguration" />
+                        <nop-label asp-for="UseDefaultCallBack" />
+                    </div>
+                    <div class="col-md-9">
+                        <nop-editor asp-for="UseDefaultCallBack" />
+                        <span asp-validation-for="UseDefaultCallBack"></span>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <div class="col-md-9 col-md-offset-3">
+                        <input type="submit" name="save" class="btn bg-primary" value="@T("Admin.Common.Save")" />
+                    </div>
+                </div>
+            </div>
+            <div class="panel-footer">
+                <div class="text-center"><p>Nop Commerce Version: 4.10</p></div>
+            </div>
+        </div>
+    </div>
+</form>
