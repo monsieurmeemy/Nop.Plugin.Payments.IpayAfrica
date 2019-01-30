@@ -98,263 +98,6 @@ namespace Nop.Plugin.Payments.IpayAfrica
             return "https://www.ipayafrica.com/ipn/";
         }
 
-        /// <summary>
-        /// Gets PDT details
-        /// </summary>
-        /// <param name="tx">TX</param>
-        /// <param name="values">Values</param>
-        /// <param name="response">Response</param>
-        /// <returns>Result</returns>
-        public bool GetPdtDetails(string tx, out Dictionary<string, string> values, out string response)
-        {
-            var req = (HttpWebRequest)WebRequest.Create(GetIpayAfricaUrl());
-            req.Method = WebRequestMethods.Http.Post;
-            req.ContentType = MimeTypes.ApplicationXWwwFormUrlencoded;
-            //now IpayAfrica requires user-agent. otherwise, we can get 403 error
-            req.UserAgent = _httpContextAccessor.HttpContext.Request.Headers[HeaderNames.UserAgent];
-
-            var formContent = $"cmd=_notify-synch&at={_IpayAfricaPaymentSettings.PdtToken}&tx={tx}";
-            req.ContentLength = formContent.Length;
-
-            using (var sw = new StreamWriter(req.GetRequestStream(), Encoding.ASCII))
-                sw.Write(formContent);
-
-            using (var sr = new StreamReader(req.GetResponse().GetResponseStream()))
-                response = WebUtility.UrlDecode(sr.ReadToEnd());
-
-            values = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-            bool firstLine = true, success = false;
-            foreach (var l in response.Split('\n'))
-            {
-                var line = l.Trim();
-                if (firstLine)
-                {
-                    success = line.Equals("SUCCESS", StringComparison.OrdinalIgnoreCase);
-                    firstLine = false;
-                }
-                else
-                {
-                    var equalPox = line.IndexOf('=');
-                    if (equalPox >= 0)
-                        values.Add(line.Substring(0, equalPox), line.Substring(equalPox + 1));
-                }
-            }
-
-            return success;
-        }
-
-        /// <summary>
-        /// Verifies IPN
-        /// </summary>
-        /// <param name="formString">Form string</param>
-        /// <param name="values">Values</param>
-        /// <returns>Result</returns>
-        public bool VerifyIpn(string formString, out Dictionary<string, string> values)
-        {
-            var req = (HttpWebRequest)WebRequest.Create(GetIpnIpayAfricaUrl());
-            req.Method = WebRequestMethods.Http.Post;
-            req.ContentType = MimeTypes.ApplicationXWwwFormUrlencoded;
-            //now IpayAfrica requires user-agent. otherwise, we can get 403 error
-            req.UserAgent = _httpContextAccessor.HttpContext.Request.Headers[HeaderNames.UserAgent];
-
-            var formContent = $"cmd=_notify-validate&{formString}";
-            req.ContentLength = formContent.Length;
-
-            using (var sw = new StreamWriter(req.GetRequestStream(), Encoding.ASCII))
-            {
-                sw.Write(formContent);
-            }
-
-            string response;
-            using (var sr = new StreamReader(req.GetResponse().GetResponseStream()))
-            {
-                response = WebUtility.UrlDecode(sr.ReadToEnd());
-            }
-            var success = response.Trim().Equals("VERIFIED", StringComparison.OrdinalIgnoreCase);
-
-            values = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-            foreach (var l in formString.Split('&'))
-            {
-                var line = l.Trim();
-                var equalPox = line.IndexOf('=');
-                if (equalPox >= 0)
-                    values.Add(line.Substring(0, equalPox), line.Substring(equalPox + 1));
-            }
-
-            return success;
-        }
-
-        /// <summary>
-        /// Create common query parameters for the request
-        /// </summary>
-        /// <param name="postProcessPaymentRequest">Payment info required for an order processing</param>
-        /// <returns>Created query parameters</returns>
-        /*private IDictionary<string, string> CreateQueryParameters(PostProcessPaymentRequest postProcessPaymentRequest)
-        {
-            //get store location
-            var storeLocation = _webHelper.GetStoreLocation();
-
-            //create query parameters
-            return new Dictionary<string, string>
-            {
-                //IpayAfrica ID or an email address associated with your IpayAfrica account
-                //["business"] = _IpayAfricaPaymentSettings.BusinessEmail, //mayank
-
-                //the character set and character encoding
-                ["charset"] = "utf-8",
-
-                //set return method to "2" (the customer redirected to the return URL by using the POST method, and all payment variables are included)
-                ["rm"] = "2",
-
-                ["bn"] = IpayAfricaHelper.NopCommercePartnerCode,
-                ["currency_code"] = _currencyService.GetCurrencyById(_currencySettings.PrimaryStoreCurrencyId)?.CurrencyCode,
-
-                //order identifier
-                ["invoice"] = postProcessPaymentRequest.Order.CustomOrderNumber,
-                ["custom"] = postProcessPaymentRequest.Order.OrderGuid.ToString(),
-
-                //PDT, IPN and cancel URL
-                ["return"] = $"{storeLocation}Plugins/PaymentIpayAfrica/PDTHandler",
-                ["notify_url"] = $"{storeLocation}Plugins/PaymentIpayAfrica/IPNHandler",
-                ["cancel_return"] = $"{storeLocation}Plugins/PaymentIpayAfrica/CancelOrder",
-
-                //shipping address, if exists
-                ["no_shipping"] = postProcessPaymentRequest.Order.ShippingStatus == ShippingStatus.ShippingNotRequired ? "1" : "2",
-                ["address_override"] = postProcessPaymentRequest.Order.ShippingStatus == ShippingStatus.ShippingNotRequired ? "0" : "1",
-                ["first_name"] = postProcessPaymentRequest.Order.ShippingAddress?.FirstName,
-                ["last_name"] = postProcessPaymentRequest.Order.ShippingAddress?.LastName,
-                ["address1"] = postProcessPaymentRequest.Order.ShippingAddress?.Address1,
-                ["address2"] = postProcessPaymentRequest.Order.ShippingAddress?.Address2,
-                ["city"] = postProcessPaymentRequest.Order.ShippingAddress?.City,
-                ["state"] = postProcessPaymentRequest.Order.ShippingAddress?.StateProvince?.Abbreviation,
-                ["country"] = postProcessPaymentRequest.Order.ShippingAddress?.Country?.TwoLetterIsoCode,
-                ["zip"] = postProcessPaymentRequest.Order.ShippingAddress?.ZipPostalCode,
-                ["email"] = postProcessPaymentRequest.Order.ShippingAddress?.Email
-            };
-        }
-        */
-
-        /// <summary>
-        /// Add order items to the request query parameters
-        /// </summary>
-        /// <param name="parameters">Query parameters</param>
-        /// <param name="postProcessPaymentRequest">Payment info required for an order processing</param>
-        /*private void AddItemsParameters(IDictionary<string, string> parameters, PostProcessPaymentRequest postProcessPaymentRequest)
-        {
-            //upload order items
-            parameters.Add("cmd", "_cart");
-            parameters.Add("upload", "1");
-
-            var cartTotal = decimal.Zero;
-            var roundedCartTotal = decimal.Zero;
-            var itemCount = 1;
-
-            //add shopping cart items
-            foreach (var item in postProcessPaymentRequest.Order.OrderItems)
-            {
-                var roundedItemPrice = Math.Round(item.UnitPriceExclTax, 2);
-
-                //add query parameters
-                parameters.Add($"item_name_{itemCount}", item.Product.Name);
-                parameters.Add($"amount_{itemCount}", roundedItemPrice.ToString("0.00", CultureInfo.InvariantCulture));
-                parameters.Add($"quantity_{itemCount}", item.Quantity.ToString());
-
-                cartTotal += item.PriceExclTax;
-                roundedCartTotal += roundedItemPrice * item.Quantity;
-                itemCount++;
-            }
-
-            //add checkout attributes as order items
-            var checkoutAttributeValues = _checkoutAttributeParser.ParseCheckoutAttributeValues(postProcessPaymentRequest.Order.CheckoutAttributesXml);
-            foreach (var attributeValue in checkoutAttributeValues)
-            {
-                var attributePrice = _taxService.GetCheckoutAttributePrice(attributeValue, false, postProcessPaymentRequest.Order.Customer);
-                var roundedAttributePrice = Math.Round(attributePrice, 2);
-
-                //add query parameters
-                if (attributeValue.CheckoutAttribute != null)
-                {
-                    parameters.Add($"item_name_{itemCount}", attributeValue.CheckoutAttribute.Name);
-                    parameters.Add($"amount_{itemCount}", roundedAttributePrice.ToString("0.00", CultureInfo.InvariantCulture));
-                    parameters.Add($"quantity_{itemCount}", "1");
-
-                    cartTotal += attributePrice;
-                    roundedCartTotal += roundedAttributePrice;
-                    itemCount++;
-                }
-            }
-
-            //add shipping fee as a separate order item, if it has price
-            var roundedShippingPrice = Math.Round(postProcessPaymentRequest.Order.OrderShippingExclTax, 2);
-            if (roundedShippingPrice > decimal.Zero)
-            {
-                parameters.Add($"item_name_{itemCount}", "Shipping fee");
-                parameters.Add($"amount_{itemCount}", roundedShippingPrice.ToString("0.00", CultureInfo.InvariantCulture));
-                parameters.Add($"quantity_{itemCount}", "1");
-
-                cartTotal += postProcessPaymentRequest.Order.OrderShippingExclTax;
-                roundedCartTotal += roundedShippingPrice;
-                itemCount++;
-            }
-
-            //add payment method additional fee as a separate order item, if it has price
-            var roundedPaymentMethodPrice = Math.Round(postProcessPaymentRequest.Order.PaymentMethodAdditionalFeeExclTax, 2);
-            if (roundedPaymentMethodPrice > decimal.Zero)
-            {
-                parameters.Add($"item_name_{itemCount}", "Payment method fee");
-                parameters.Add($"amount_{itemCount}", roundedPaymentMethodPrice.ToString("0.00", CultureInfo.InvariantCulture));
-                parameters.Add($"quantity_{itemCount}", "1");
-
-                cartTotal += postProcessPaymentRequest.Order.PaymentMethodAdditionalFeeExclTax;
-                roundedCartTotal += roundedPaymentMethodPrice;
-                itemCount++;
-            }
-
-            //add tax as a separate order item, if it has positive amount
-            var roundedTaxAmount = Math.Round(postProcessPaymentRequest.Order.OrderTax, 2);
-            if (roundedTaxAmount > decimal.Zero)
-            {
-                parameters.Add($"item_name_{itemCount}", "Tax amount");
-                parameters.Add($"amount_{itemCount}", roundedTaxAmount.ToString("0.00", CultureInfo.InvariantCulture));
-                parameters.Add($"quantity_{itemCount}", "1");
-
-                cartTotal += postProcessPaymentRequest.Order.OrderTax;
-                roundedCartTotal += roundedTaxAmount;
-                itemCount++;
-            }
-
-            if (cartTotal > postProcessPaymentRequest.Order.OrderTotal)
-            {
-                //get the difference between what the order total is and what it should be and use that as the "discount"
-                var discountTotal = Math.Round(cartTotal - postProcessPaymentRequest.Order.OrderTotal, 2);
-                roundedCartTotal -= discountTotal;
-
-                //gift card or rewarded point amount applied to cart in nopCommerce - shows in IpayAfrica as "discount"
-                parameters.Add("discount_amount_cart", discountTotal.ToString("0.00", CultureInfo.InvariantCulture));
-            }
-
-            //save order total that actually sent to IpayAfrica (used for PDT order total validation)
-            _genericAttributeService.SaveAttribute(postProcessPaymentRequest.Order, IpayAfricaHelper.OrderTotalSentToIpayAfrica, roundedCartTotal);
-        }
-        */
-        /// <summary>
-        /// Add order total to the request query parameters
-        /// </summary>
-        /// <param name="parameters">Query parameters</param>
-        /// <param name="postProcessPaymentRequest">Payment info required for an order processing</param>
-        /*private void AddOrderTotalParameters(IDictionary<string, string> parameters, PostProcessPaymentRequest postProcessPaymentRequest)
-        {
-            //round order total
-            var roundedOrderTotal = Math.Round(postProcessPaymentRequest.Order.OrderTotal, 2);
-
-            parameters.Add("cmd", "_xclick");
-            parameters.Add("item_name", $"Order Number {postProcessPaymentRequest.Order.CustomOrderNumber}");
-            parameters.Add("amount", roundedOrderTotal.ToString("0.00", CultureInfo.InvariantCulture));
-
-            //save order total that actually sent to IpayAfrica (used for PDT order total validation)
-            _genericAttributeService.SaveAttribute(postProcessPaymentRequest.Order, IpayAfricaHelper.OrderTotalSentToIpayAfrica, roundedOrderTotal);
-        }
-        */
         #endregion
 
         #region Methods
@@ -381,25 +124,6 @@ namespace Nop.Plugin.Payments.IpayAfrica
             //create common query parameters for the request
             var queryParameters = new Dictionary<string, string>();// CreateQueryParameters(postProcessPaymentRequest); //mayank
 
-            //whether to include order items in a transaction
-            /*if (_IpayAfricaPaymentSettings.PassProductNamesAndTotals) //mayank
-            {
-                //add order items query parameters to the request
-                var parameters = new Dictionary<string, string>(queryParameters);
-                AddItemsParameters(parameters, postProcessPaymentRequest);
-
-                //remove null values from parameters
-                parameters = parameters.Where(parameter => !string.IsNullOrEmpty(parameter.Value))
-                    .ToDictionary(parameter => parameter.Key, parameter => parameter.Value);
-
-                //ensure redirect URL doesn't exceed 2K chars to avoid "too long URL" exception
-                var redirectUrl = QueryHelpers.AddQueryString(GetIpayAfricaUrl(), parameters);
-                if (redirectUrl.Length <= 2048)
-                {
-                    _httpContextAccessor.HttpContext.Response.Redirect(redirectUrl);
-                    return;
-                }
-            }*/
             var storeLocation = _webHelper.GetStoreLocation();
             string key = _IpayAfricaPaymentSettings.MerchantKey;
             string autopay = "1";
@@ -458,20 +182,11 @@ namespace Nop.Plugin.Payments.IpayAfrica
             queryParameters.Add("p2", p2);
             queryParameters.Add("p3", p3);
             queryParameters.Add("p4", p4);
-            if (_IpayAfricaPaymentSettings.UseDefaultCallBack)
-            {
-                queryParameters.Add("cbk", _webHelper.GetStoreLocation(false) + "Plugins/PaymentIpayAfrica/Return");
-            }
-            else
-            {
-                queryParameters.Add("cbk", _IpayAfricaPaymentSettings.CallBackUrl.Trim());
-            }
+            queryParameters.Add("cbk", callback_url);
             queryParameters.Add("cst", email_notify);
             queryParameters.Add("crl", curl);
 
             queryParameters.Add("hsh", String.Concat(Array.ConvertAll(hashmessage, x => x.ToString("x2"))));
-
-            //AddOrderTotalParameters(queryParameters, postProcessPaymentRequest);
 
             //remove null values from parameters
             queryParameters = queryParameters.Where(parameter => !string.IsNullOrEmpty(parameter.Value))
@@ -621,13 +336,7 @@ namespace Nop.Plugin.Payments.IpayAfrica
             var settings = new IpayAfricaPaymentSettings() //mayank
             {
                 MerchantId = "",
-                MerchantKey = "",
-                Website = "",
-                IndustryTypeId = "",
-                PaymentUrl = "",
-                CallBackUrl = _webHelper.GetStoreLocation(false) + "Plugins/PaymentIpayAfrica/Return",
-                TxnStatusUrl = "",
-                UseDefaultCallBack = true
+                MerchantKey = ""
             };
             _settingService.SaveSetting(settings);
 
@@ -635,21 +344,9 @@ namespace Nop.Plugin.Payments.IpayAfrica
             _localizationService.AddOrUpdatePluginLocaleResource("Plugins.Payments.IpayAfrica.RedirectionTip", "Pay with your MPESA or Airtel Money Mobile Wallet. You will be redirected to IpayAfrica site to complete the order.");
             _localizationService.AddOrUpdatePluginLocaleResource("Plugins.Payments.IpayAfrica.MerchantId", "Merchant ID");
             _localizationService.AddOrUpdatePluginLocaleResource("Plugins.Payments.IpayAfrica.MerchantId.Hint", "Enter merchant ID.");
-            _localizationService.AddOrUpdatePluginLocaleResource("Plugins.Payments.IpayAfrica.UseDefaultCallBack", "Default CallBack");
-            _localizationService.AddOrUpdatePluginLocaleResource("Plugins.Payments.IpayAfrica.UseDefaultCallBack.Hint", "Uncheck and use customized CallBack Url in below field.");
             _localizationService.AddOrUpdatePluginLocaleResource("Plugins.Payments.IpayAfrica.MerchantKey", "Merchant Key");
             _localizationService.AddOrUpdatePluginLocaleResource("Plugins.Payments.IpayAfrica.MerchantKey.Hint", "Enter Merchant key.");
-            _localizationService.AddOrUpdatePluginLocaleResource("Plugins.Payments.IpayAfrica.Website", "Website");
-            _localizationService.AddOrUpdatePluginLocaleResource("Plugins.Payments.IpayAfrica.Website.Hint", "Enter website param.");
-            _localizationService.AddOrUpdatePluginLocaleResource("Plugins.Payments.IpayAfrica.IndustryTypeId", "Industry Type Id");
-            _localizationService.AddOrUpdatePluginLocaleResource("Plugins.Payments.IpayAfrica.IndustryTypeId.Hint", "Enter Industry Type Id.");
-            _localizationService.AddOrUpdatePluginLocaleResource("Plugins.Payments.IpayAfrica.PaymentUrl", "Payment URL");
-            _localizationService.AddOrUpdatePluginLocaleResource("Plugins.Payments.IpayAfrica.PaymentUrl.Hint", "Select payment url.");
-            _localizationService.AddOrUpdatePluginLocaleResource("Plugins.Payments.IpayAfrica.CallBackUrl", "Callback URL");
-            _localizationService.AddOrUpdatePluginLocaleResource("Plugins.Payments.IpayAfrica.CallBackUrl.Hint", "Enter call back url.");
-            _localizationService.AddOrUpdatePluginLocaleResource("Plugins.Payments.IpayAfrica.TxnStatusUrl", "TxnStatus URL");
-            _localizationService.AddOrUpdatePluginLocaleResource("Plugins.Payments.IpayAfrica.TxnStatusUrl.Hint", "Enter TxnStatus back url.");
-            _localizationService.AddOrUpdatePluginLocaleResource("Plugins.Payments.IpayAfrica.PaymentMethodDescription", "Pay by IpayAfrica Wallet / credit / debit card / Net Banking");
+            _localizationService.AddOrUpdatePluginLocaleResource("Plugins.Payments.IpayAfrica.PaymentMethodDescription", "Pay with your MPESA or Airtel Money Mobile Wallet. You will be redirected to IpayAfrica site to complete the order.");
             base.Install();
 
         }
@@ -666,20 +363,8 @@ namespace Nop.Plugin.Payments.IpayAfrica
             _localizationService.DeletePluginLocaleResource("Plugins.Payments.IpayAfrica.RedirectionTip");
             _localizationService.DeletePluginLocaleResource("Plugins.Payments.IpayAfrica.MerchantId");
             _localizationService.DeletePluginLocaleResource("Plugins.Payments.IpayAfrica.MerchantId.Hint");
-            _localizationService.DeletePluginLocaleResource("Plugins.Payments.IpayAfrica.UseDefaultCallBack");
-            _localizationService.DeletePluginLocaleResource("Plugins.Payments.IpayAfrica.UseDefaultCallBack.Hint");
             _localizationService.DeletePluginLocaleResource("Plugins.Payments.IpayAfrica.MerchantKey");
             _localizationService.DeletePluginLocaleResource("Plugins.Payments.IpayAfrica.MerchantKey.Hint");
-            _localizationService.DeletePluginLocaleResource("Plugins.Payments.IpayAfrica.Website");
-            _localizationService.DeletePluginLocaleResource("Plugins.Payments.IpayAfrica.Website.Hint");
-            _localizationService.DeletePluginLocaleResource("Plugins.Payments.IpayAfrica.IndustryTypeId");
-            _localizationService.DeletePluginLocaleResource("Plugins.Payments.IpayAfrica.IndustryTypeId.Hint");
-            _localizationService.DeletePluginLocaleResource("Plugins.Payments.IpayAfrica.PaymentUrl");
-            _localizationService.DeletePluginLocaleResource("Plugins.Payments.IpayAfrica.PaymentUrl.Hint");
-            _localizationService.DeletePluginLocaleResource("Plugins.Payments.IpayAfrica.CallBackUrl");
-            _localizationService.DeletePluginLocaleResource("Plugins.Payments.IpayAfrica.CallBackUrl.Hint");
-            _localizationService.DeletePluginLocaleResource("Plugins.Payments.IpayAfrica.TxnStatusUrl");
-            _localizationService.DeletePluginLocaleResource("Plugins.Payments.IpayAfrica.TxnStatusUrl.Hint");
             _localizationService.DeletePluginLocaleResource("Plugins.Payments.IpayAfrica.PaymentMethodDescription");
 
             base.Uninstall();
