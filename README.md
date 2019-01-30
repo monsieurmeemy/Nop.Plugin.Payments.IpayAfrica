@@ -11,8 +11,8 @@ Alternatively, you can install the plugin by pasting the folder in the Installab
 # Configuraion
 To configure your plugins, go to its configuration page and set your Ipay Merchant/Vendor ID and Key in the relevant fields to start receiving payments in your site.
 
-![alt text](http://url/to/configuration.png.png)
-![alt text](http://url/to/checkout.png.png)
+![alt text](https://github.com/monsieurmeemy/Nop.Plugin.Payments.IpayAfrica/blob/master/configuration.png)
+![alt text](https://github.com/monsieurmeemy/Nop.Plugin.Payments.IpayAfrica/blob/master/checkout.png)
 
 
 
