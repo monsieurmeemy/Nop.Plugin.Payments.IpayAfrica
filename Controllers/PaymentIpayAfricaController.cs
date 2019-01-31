@@ -331,7 +331,7 @@ namespace Nop.Plugin.Payments.IpayAfrica.Controllers
                     html = reader.ReadToEnd();
                 }
                 //if (html.Contains("aei7p7yrx4ae34") || html.Contains("eq3i7p5yt7645e"))
-                if (html.Contains("aei7p7yrx4ae34") || html.Contains("eq3i7p5yt7645e") && order.OrderTotal >= System.Convert.ToDecimal(paid_total))
+                if (html.Contains("aei7p7yrx4ae34") || html.Contains("eq3i7p5yt7645e") && System.Convert.ToDecimal(paid_total) >= order.OrderTotal)
                 {
                     if (_orderProcessingService.CanMarkOrderAsPaid(order))
                     {
@@ -352,7 +352,7 @@ namespace Nop.Plugin.Payments.IpayAfrica.Controllers
                     //order note
                     order.OrderNotes.Add(new OrderNote
                     {
-                        Note = "Failed due to amount mismatch. Your attempt to pay via " + channel + " was successful. Your transaction code was " + transactinon_code,
+                        Note = "Failed due to amount mismatch. You paid " + paid_total + " instead of " + order.OrderTotal + " via " + channel + " Your transaction code was " + transactinon_code,
                         DisplayToCustomer = true,
                         CreatedOnUtc = DateTime.UtcNow
                     });
@@ -388,7 +388,7 @@ namespace Nop.Plugin.Payments.IpayAfrica.Controllers
                 {
                     html = reader.ReadToEnd();
                 }
-                if (html.Contains("aei7p7yrx4ae34") || html.Contains("eq3i7p5yt7645e") && order.OrderTotal >= System.Convert.ToDecimal(paid_total))
+                if (html.Contains("aei7p7yrx4ae34") || html.Contains("eq3i7p5yt7645e") && System.Convert.ToDecimal(paid_total) >= order.OrderTotal)
                 {
                     if (_orderProcessingService.CanMarkOrderAsPaid(order))
                     {
@@ -408,7 +408,7 @@ namespace Nop.Plugin.Payments.IpayAfrica.Controllers
                     //order note
                     order.OrderNotes.Add(new OrderNote
                     {
-                        Note = "Failed due to amount mismatch. Your attempt to pay via " + channel + " was successful. Your transaction code was " + transactinon_code,
+                        Note = "Failed due to amount mismatch. You paid " + paid_total + " instead of " + order.OrderTotal + " via " + channel + " Your transaction code was " + transactinon_code,
                         DisplayToCustomer = true,
                         CreatedOnUtc = DateTime.UtcNow
                     });
