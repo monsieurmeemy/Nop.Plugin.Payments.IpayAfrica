@@ -1,0 +1,16 @@
+﻿{
+  "Group": "Payment methods",
+  "FriendlyName": "Ipay Africa",
+  "SystemName": "Payments.IpayAfrica",
+  "Version": "1.0",
+  "SupportedVersions": [
+    "4.20"
+  ],
+  "Author": "Stephen Mwanzi",
+  "DisplayOrder": 1,
+  "FileName": "Nop.Plugin.Payments.IpayAfrica.dll",
+  "Description": "This plugin allows paying with IPay Arica",
+  "LimitedToStores": [],
+  "LimitedToCustomerRoles": [],
+  "DependsOnSystemNames": null
+}
