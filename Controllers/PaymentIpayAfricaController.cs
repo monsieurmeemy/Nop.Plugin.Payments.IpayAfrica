@@ -26,6 +26,7 @@ using Nop.Services.Directory;
 using Nop.Services.Tax;
 using Nop.Core.Domain.Directory;
 using System.Security.Cryptography;
+using Nop.Services.Messages;
 
 namespace Nop.Plugin.Payments.IpayAfrica.Controllers
 {
@@ -38,6 +39,7 @@ namespace Nop.Plugin.Payments.IpayAfrica.Controllers
         private readonly ISettingService _settingService;
         private readonly IPaymentService _paymentService;
         private readonly IOrderService _orderService;
+        private readonly IPaymentPluginManager _paymentPluginManager;
         private readonly IOrderProcessingService _orderProcessingService;
         private readonly IPermissionService _permissionService;
         private readonly IGenericAttributeService _genericAttributeService;
@@ -52,6 +54,7 @@ namespace Nop.Plugin.Payments.IpayAfrica.Controllers
         private readonly IHttpContextAccessor _httpContextAccessor;
         private readonly ITaxService _taxService;
         private readonly ICurrencyService _currencyService;
+        private readonly INotificationService _notificationService;
         #endregion
 
         #region Ctor
@@ -68,6 +71,7 @@ namespace Nop.Plugin.Payments.IpayAfrica.Controllers
             IStoreContext storeContext,
             ILogger logger,
             IWebHelper webHelper,
+            IPaymentPluginManager paymentPluginManager,
             PaymentSettings paymentSettings,
             IpayAfricaPaymentSettings IpayAfricaPaymentSettings,
             ShoppingCartSettings shoppingCartSettings,
@@ -75,9 +79,10 @@ namespace Nop.Plugin.Payments.IpayAfrica.Controllers
             ICheckoutAttributeParser checkoutAttributeParser,
             ICurrencyService currencyService,
             IHttpContextAccessor httpContextAccessor,
-            ITaxService taxService)
+            ITaxService taxService,
+            INotificationService notificationService
+            )
         {
-            this._workContext = workContext;
             this._storeService = storeService;
             this._settingService = settingService;
             this._paymentService = paymentService;
@@ -98,6 +103,19 @@ namespace Nop.Plugin.Payments.IpayAfrica.Controllers
             this._genericAttributeService = genericAttributeService;
             this._httpContextAccessor = httpContextAccessor;
             this._taxService = taxService;
+            _genericAttributeService = genericAttributeService;
+            _orderProcessingService = orderProcessingService;
+            _orderService = orderService;
+            _paymentPluginManager = paymentPluginManager;
+            _permissionService = permissionService;
+            _localizationService = localizationService;
+            _logger = logger;
+            _notificationService = notificationService;
+            _settingService = settingService;
+            _storeContext = storeContext;
+            _webHelper = webHelper;
+            _workContext = workContext;
+            _shoppingCartSettings = shoppingCartSettings;
         }
 
         #endregion
@@ -144,17 +162,20 @@ namespace Nop.Plugin.Payments.IpayAfrica.Controllers
             _IpayAfricaPaymentSettings.MerchantId = model.MerchantId;
             _IpayAfricaPaymentSettings.MerchantKey = model.MerchantKey;
             _settingService.SaveSetting(_IpayAfricaPaymentSettings);
-            SuccessNotification(_localizationService.GetResource("Admin.Plugins.Saved"));
+            _notificationService.SuccessNotification(_localizationService.GetResource("Admin.Plugins.Saved"));
             return Configure();
 
         }
 
         public ActionResult Return()
         {
-            var processor = _paymentService.LoadPaymentMethodBySystemName("Payments.IpayAfrica") as IpayAfricaPaymentProcessor;
-            if (processor == null ||
-                !_paymentService.IsPaymentMethodActive(processor) || !processor.PluginDescriptor.Installed)
-                throw new NopException("IpayAfrica module cannot be loaded");
+            if (!(_paymentPluginManager.LoadPluginBySystemName("Payments.IpayAfrica") is IpayAfricaPaymentProcessor processor) || !_paymentPluginManager.IsPluginActive(processor))
+                throw new NopException("PayPal Standard module cannot be loaded");
+
+            //var processor = _paymentPluginManager.LoadPluginBySystemName("Payments.IpayAfrica") as IpayAfricaPaymentProcessor;
+            //if (processor == null ||
+            //    !_paymentService.IsPaymentMethodActive(processor) || !processor.PluginDescriptor.Installed)
+            //    throw new NopException("IpayAfrica module cannot be loaded");
 
 
             var myUtility = new IpayAfricaHelper();

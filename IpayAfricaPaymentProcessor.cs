@@ -13,13 +13,16 @@ using Nop.Core.Domain.Directory;
 using Nop.Core.Domain.Orders;
 using Nop.Services.Payments;
 using Nop.Core.Domain.Shipping;
-using Nop.Core.Plugins;
+using Nop.Services.Plugins;
 using Nop.Services.Common;
 using Nop.Services.Configuration;
 using Nop.Services.Directory;
 using Nop.Services.Localization;
 using Nop.Services.Orders;
 using Nop.Services.Tax;
+using Nop.Services.Logging;
+using Nop.Services.Messages;
+using Nop.Services.Security;
 using System.Security.Cryptography;
 
 namespace Nop.Plugin.Payments.IpayAfrica
@@ -126,7 +129,7 @@ namespace Nop.Plugin.Payments.IpayAfrica
 
             var storeLocation = _webHelper.GetStoreLocation();
             string key = _IpayAfricaPaymentSettings.MerchantKey;
-            string autopay = "1";
+            //string autopay = "1";
             string mpesa = "1";
             string airtel = "1";
             string equity = "1";

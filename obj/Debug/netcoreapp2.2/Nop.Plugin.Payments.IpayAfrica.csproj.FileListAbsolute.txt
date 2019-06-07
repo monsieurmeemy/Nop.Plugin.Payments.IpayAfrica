@@ -1,0 +1,15 @@
+F:\My Sites\nopCommerce_4.20_Source\Plugins\Nop.Plugin.Payments.IpayAfrica\obj\Debug\netcoreapp2.2\Nop.Plugin.Payments.IpayAfrica.csprojAssemblyReference.cache
+F:\My Sites\nopCommerce_4.20_Source\Plugins\Nop.Plugin.Payments.IpayAfrica\obj\Debug\netcoreapp2.2\Nop.Plugin.Payments.IpayAfrica.csproj.CoreCompileInputs.cache
+F:\My Sites\nopCommerce_4.20_Source\Plugins\Nop.Plugin.Payments.IpayAfrica\obj\Debug\netcoreapp2.2\Nop.Plugin.Payments.IpayAfrica.AssemblyInfoInputs.cache
+F:\My Sites\nopCommerce_4.20_Source\Plugins\Nop.Plugin.Payments.IpayAfrica\obj\Debug\netcoreapp2.2\Nop.Plugin.Payments.IpayAfrica.AssemblyInfo.cs
+F:\My Sites\nopCommerce_4.20_Source\Presentation\Nop.Web\Plugins\Payments.IpayAfrica\Views\Configure.cshtml
+F:\My Sites\nopCommerce_4.20_Source\Presentation\Nop.Web\Plugins\Payments.IpayAfrica\Views\PaymentInfo.cshtml
+F:\My Sites\nopCommerce_4.20_Source\Presentation\Nop.Web\Plugins\Payments.IpayAfrica\Views\_ViewImports.cshtml
+F:\My Sites\nopCommerce_4.20_Source\Presentation\Nop.Web\Plugins\Payments.IpayAfrica\plugin.json
+F:\My Sites\nopCommerce_4.20_Source\Presentation\Nop.Web\Plugins\Payments.IpayAfrica\logo.jpg
+F:\My Sites\nopCommerce_4.20_Source\Presentation\Nop.Web\Plugins\Payments.IpayAfrica\Nop.Plugin.Payments.IpayAfrica.deps.json
+F:\My Sites\nopCommerce_4.20_Source\Presentation\Nop.Web\Plugins\Payments.IpayAfrica\Nop.Plugin.Payments.IpayAfrica.dll
+F:\My Sites\nopCommerce_4.20_Source\Presentation\Nop.Web\Plugins\Payments.IpayAfrica\Nop.Plugin.Payments.IpayAfrica.pdb
+F:\My Sites\nopCommerce_4.20_Source\Plugins\Nop.Plugin.Payments.IpayAfrica\obj\Debug\netcoreapp2.2\Nop.Plugin.Payments.IpayAfrica.csproj.CopyComplete
+F:\My Sites\nopCommerce_4.20_Source\Plugins\Nop.Plugin.Payments.IpayAfrica\obj\Debug\netcoreapp2.2\Nop.Plugin.Payments.IpayAfrica.dll
+F:\My Sites\nopCommerce_4.20_Source\Plugins\Nop.Plugin.Payments.IpayAfrica\obj\Debug\netcoreapp2.2\Nop.Plugin.Payments.IpayAfrica.pdb

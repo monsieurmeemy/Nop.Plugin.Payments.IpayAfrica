@@ -3,7 +3,7 @@
   "FriendlyName": "Ipay Africa",
   "SystemName": "Payments.IpayAfrica",
   "Version": "1.0",
-  "SupportedVersions": [ "4.10" ],
+  "SupportedVersions": [ "4.20" ],
   "Author": "Stephen Mwanzi",
   "DisplayOrder": 1,
   "FileName": "Nop.Plugin.Payments.IpayAfrica.dll",
