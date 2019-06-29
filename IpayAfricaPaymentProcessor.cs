@@ -143,8 +143,8 @@ namespace Nop.Plugin.Payments.IpayAfrica
             string invoice_number = order_id;
             string callback_url = $"{storeLocation}Plugins/PaymentIpayAfrica/Return";
 
-            string customer_email = postProcessPaymentRequest.Order.ShippingAddress?.Email;
-            string mobile_number = postProcessPaymentRequest.Order.ShippingAddress?.PhoneNumber;
+            string customer_email = postProcessPaymentRequest.Order.BillingAddress?.Email;
+            string mobile_number = postProcessPaymentRequest.Order.BillingAddress?.PhoneNumber;
             if (mobile_number.Length > 10)
             {
                 mobile_number = mobile_number.Remove(0, 4).Insert(0, "0");
@@ -155,7 +155,7 @@ namespace Nop.Plugin.Payments.IpayAfrica
             var curl = "0";
             string cart_total = postProcessPaymentRequest.Order.OrderTotal.ToString();
             string p2 = callback_url;
-            string p1 = postProcessPaymentRequest.Order.ShippingAddress?.Email;
+            string p1 = postProcessPaymentRequest.Order.BillingAddress?.Email;
             string p3 = currency;
             string p4 = curl;
             string datastring = live.ToString() + order_id + invoice_number + cart_total + mobile_number + customer_email + vendor_id + currency + p1 + p2 + p3 + p4 + callback_url + email_notify.ToString() + curl.ToString();
@@ -344,12 +344,12 @@ namespace Nop.Plugin.Payments.IpayAfrica
             _settingService.SaveSetting(settings);
 
             //locales
-            _localizationService.AddOrUpdatePluginLocaleResource("Plugins.Payments.IpayAfrica.RedirectionTip", "Pay with your MPESA or Airtel Money Mobile Wallet. You will be redirected to IpayAfrica site to complete the order.");
+            _localizationService.AddOrUpdatePluginLocaleResource("Plugins.Payments.IpayAfrica.RedirectionTip", "Pay with Equity, Visa/Master Card, MPESA or Airtel Money Mobile Wallet. You will be redirected to IpayAfrica site to complete the order.");
             _localizationService.AddOrUpdatePluginLocaleResource("Plugins.Payments.IpayAfrica.MerchantId", "Merchant ID");
             _localizationService.AddOrUpdatePluginLocaleResource("Plugins.Payments.IpayAfrica.MerchantId.Hint", "Enter merchant ID.");
             _localizationService.AddOrUpdatePluginLocaleResource("Plugins.Payments.IpayAfrica.MerchantKey", "Merchant Key");
             _localizationService.AddOrUpdatePluginLocaleResource("Plugins.Payments.IpayAfrica.MerchantKey.Hint", "Enter Merchant key.");
-            _localizationService.AddOrUpdatePluginLocaleResource("Plugins.Payments.IpayAfrica.PaymentMethodDescription", "Pay with your MPESA or Airtel Money Mobile Wallet. You will be redirected to IpayAfrica site to complete the order.");
+            _localizationService.AddOrUpdatePluginLocaleResource("Plugins.Payments.IpayAfrica.PaymentMethodDescription", "Pay with Equity, Visa/Master Card, MPESA or Airtel Money Mobile Wallet. You will be redirected to IpayAfrica site to complete the order.");
             base.Install();
 
         }
