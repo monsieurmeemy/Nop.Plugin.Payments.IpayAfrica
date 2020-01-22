@@ -336,7 +336,7 @@ namespace Nop.Plugin.Payments.IpayAfrica
         public override void Install()
         {
             //settings
-            var settings = new IpayAfricaPaymentSettings() //mayank
+            var settings = new IpayAfricaPaymentSettings()
             {
                 MerchantId = "",
                 MerchantKey = ""

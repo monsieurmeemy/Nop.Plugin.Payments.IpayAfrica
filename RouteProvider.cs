@@ -11,11 +11,6 @@ namespace Nop.Plugin.Payments.IpayAfrica
             routeBuilder.MapRoute("Plugin.Payments.IpayAfrica.Return",
                  "Plugins/PaymentIpayAfrica/Return",
                  new { controller = "PaymentIpayAfrica", action = "Return" });
-
-            /*routeBuilder.MapRoute("Plugin.Payments.IpayAfrica.Return",
-                "Plugins/PaymentIpayAfrica/Return",
-                new { controller = "PaymentIpayAfrica", action = "Return" },
-                new[] { "Nop.Plugin.Payments.IpayAfrica.Controllers" });*/
         }
 
         public int Priority

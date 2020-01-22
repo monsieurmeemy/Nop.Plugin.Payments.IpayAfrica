@@ -130,7 +130,6 @@ namespace Nop.Plugin.Payments.IpayAfrica.Controllers
                 return AccessDeniedView();
 
             //load settings for a chosen store scope
-            //var storeScope = this.GetActiveStoreScopeConfiguration(_storeService, _workContext);
             var storeScope = _storeContext.ActiveStoreScopeConfiguration;
             var IpayAfricaPaymentSettings = _settingService.LoadSetting<IpayAfricaPaymentSettings>(storeScope);
 
@@ -171,11 +170,6 @@ namespace Nop.Plugin.Payments.IpayAfrica.Controllers
         {
             if (!(_paymentPluginManager.LoadPluginBySystemName("Payments.IpayAfrica") is IpayAfricaPaymentProcessor processor) || !_paymentPluginManager.IsPluginActive(processor))
                 throw new NopException("PayPal Standard module cannot be loaded");
-
-            //var processor = _paymentPluginManager.LoadPluginBySystemName("Payments.IpayAfrica") as IpayAfricaPaymentProcessor;
-            //if (processor == null ||
-            //    !_paymentService.IsPaymentMethodActive(processor) || !processor.PluginDescriptor.Installed)
-            //    throw new NopException("IpayAfrica module cannot be loaded");
 
 
             var myUtility = new IpayAfricaHelper();
@@ -298,7 +292,6 @@ namespace Nop.Plugin.Payments.IpayAfrica.Controllers
                                 DisplayToCustomer = true,
                                 CreatedOnUtc = DateTime.UtcNow
                             });
-                            //_orderService.UpdateOrder(order);
                             _orderProcessingService.MarkOrderAsPaid(order);
                         }
                         return RedirectToRoute("CheckoutCompleted", new { orderId = order.Id });
@@ -312,7 +305,6 @@ namespace Nop.Plugin.Payments.IpayAfrica.Controllers
                             DisplayToCustomer = true,
                             CreatedOnUtc = DateTime.UtcNow
                         });
-                        //_orderService.UpdateOrder(order);
                         return Content("Amount Mismatch" + " " + html + " " + order.OrderTotal.ToString());
                     }
                 }
@@ -351,7 +343,7 @@ namespace Nop.Plugin.Payments.IpayAfrica.Controllers
                 {
                     html = reader.ReadToEnd();
                 }
-                //if (html.Contains("aei7p7yrx4ae34") || html.Contains("eq3i7p5yt7645e"))
+
                 if (html.Contains("aei7p7yrx4ae34") || html.Contains("eq3i7p5yt7645e") && System.Convert.ToDecimal(paid_total) >= order.OrderTotal)
                 {
                     if (_orderProcessingService.CanMarkOrderAsPaid(order))
@@ -387,7 +379,7 @@ namespace Nop.Plugin.Payments.IpayAfrica.Controllers
             }
             else if(status == "fe2707etr5s4wq")//failed
             {
-                //return Content("Security Error. Illegal access detected, Checksum failed");
+                
                 if (_orderProcessingService.CanVoidOffline(order))
                 {
                     _orderProcessingService.VoidOffline(order);
